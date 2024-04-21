@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from tensorflow import keras
+
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import Sequential
 
@@ -7,9 +9,18 @@ from tensorflow.keras.layers import LSTM, Dense, Bidirectional, Input
 
 from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
+print(tf.__version__)
+
 tf.get_logger().setLevel('DEBUG')
-model = load_model('my_lstm_model.keras', custom_objects=None, compile=True, safe_mode=True)
-model.compile(optimizer=Adam(learning_rate=0.001), loss='mse')
+model = tf.keras.models.load_model('my_lstm_model.keras')
+
+# Convert the model to the TensorFlow Lite format
+# converter = tf.lite.TFLiteConverter.from_keras_model(model)
+# tflite_model = converter.convert()
+
+# # Save the converted model
+# with open('model.tflite', 'wb') as f:
+#     f.write(tflite_model)
 
 
 

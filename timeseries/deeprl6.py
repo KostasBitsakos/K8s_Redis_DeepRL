@@ -82,7 +82,7 @@ def run():
 
         if episode % 1 == 0:  # Save every episode
             agent.model.save(f'model_episode_{episode}.keras')
-            df.to_csv('updated_system_metrics.csv', index=False)
+            df.to_csv('updated4_system_metrics.csv', index=False)
 
 if __name__ == '__main__':
     run()

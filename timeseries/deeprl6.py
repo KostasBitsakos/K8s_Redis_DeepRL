@@ -68,7 +68,7 @@ def run():
             # Apply the action to get the next state
             next_num_vms = row['num_vms'] + (action - 1)  # Subtract 1 to map actions to changes
             next_state = np.array([[row['Throughput'], row['Latency'], row['CPU Usage'], row['Memory Usage'], next_num_vms]])
-            reward = 10*row['Throughput'] - row['Latency'] - 10*row['CPU Usage'] - 10*row['Memory Usage'] - next_num_vms
+            reward = 20*row['Throughput'] - row['Latency'] - 10*row['CPU Usage'] - 10*row['Memory Usage'] - 5*next_num_vms
             done = index == df.index[-1]
             agent.remember(state, action, reward, next_state, done)
             total_reward += reward

@@ -64,7 +64,7 @@ def run():
             state = np.array([[row['Throughput'], row['Latency'], row['CPU Usage'], row['Memory Usage']]])
             action = agent.act(state)
             next_state = state  # This should ideally be the next actual state
-            reward = row['Throughput'] - row['Latency'] - row['CPU Usage'] - row['Memory Usage']
+            reward = 4*row['Throughput'] - row['Latency'] - 10*row['CPU Usage'] -10* row['Memory Usage']
             done = index == df.index[-1]
             agent.remember(state, action, reward, next_state, done)
             total_reward += reward

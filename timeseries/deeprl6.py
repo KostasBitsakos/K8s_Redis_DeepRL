@@ -54,7 +54,9 @@ class DQNAgent:
             self.epsilon *= self.epsilon_decay
 
 def run():
-    agent = DQNAgent(state_size=5, action_size=2)  # Now including num_vms in state
+    state_size = 5
+    action_size = 3  # Now we have 3 actions: 0 (decrease), 1 (maintain), 2 (increase) VMs
+    agent = DQNAgent(state_size, action_size)
     batch_size = 32
     episodes = 10  # Control the number of episodes
 
@@ -63,8 +65,10 @@ def run():
         for index, row in df.iterrows():
             state = np.array([[row['Throughput'], row['Latency'], row['CPU Usage'], row['Memory Usage'], row['num_vms']]])
             action = agent.act(state)
-            next_state = state  # This should ideally be the next actual state
-            reward = 4*row['Throughput'] - row['Latency'] - 10*row['CPU Usage'] - 10*row['Memory Usage'] - row['num_vms']
+            # Apply the action to get the next state
+            next_num_vms = row['num_vms'] + (action - 1)  # Subtract 1 to map actions to changes
+            next_state = np.array([[row['Throughput'], row['Latency'], row['CPU Usage'], row['Memory Usage'], next_num_vms]])
+            reward = 4*row['Throughput'] - row['Latency'] - 10*row['CPU Usage'] - 10*row['Memory Usage'] - next_num_vms
             done = index == df.index[-1]
             agent.remember(state, action, reward, next_state, done)
             total_reward += reward
@@ -73,11 +77,12 @@ def run():
                 agent.replay(batch_size)
 
             # Update and print status
-            df.loc[index, 'num_vms'] = 6 + action  # Update num_vms based on action
+            df.loc[index, 'num_vms'] = next_num_vms  # Update num_vms based on action
             print(f"Episode {episode+1}, Step {index+1}, Total Reward: {total_reward}")
 
-        if episode % 1 == 0:  # Save every 10 episodes
-            df.to_csv('updated3_system_metrics.csv', index=False)
+        if episode % 1 == 0:  # Save every episode
+            agent.model.save(f'model_episode_{episode}.keras')
+            df.to_csv('updated_system_metrics.csv', index=False)
 
 if __name__ == '__main__':
     run()

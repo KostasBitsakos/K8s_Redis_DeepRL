@@ -88,31 +88,31 @@ def run():
     batch_size = 32
     result_data = []
     start_time = time.time()
+    max_steps = len(df) - 1  # Set a maximum number of steps to the length of the dataset
 
-    try:
-        for t in range(len(df) - 1):
-            if t % 100 == 0:
-                print(f"Processing step {t+1}/{len(df)-1}. Time elapsed: {time.time() - start_time:.2f} seconds.")
-            state = env.num_vms
-            action = agent.act([state])
-            next_state, reward, done, load, latency = env.step(t, action)
-            agent.remember([state], action, reward, [next_state], done)
-            state = next_state
+    for t in range(max_steps):
+        if t % 100 == 0:  # Print progress every 100 steps
+            elapsed_time = time.time() - start_time
+            print(f"Processing step {t+1}/{max_steps}. Time elapsed: {elapsed_time:.2f} seconds.")
 
-            if len(agent.memory) > batch_size:
-                agent.replay(batch_size)
+        state = env.num_vms
+        action = agent.act([state])
+        next_state, reward, done, load, latency = env.step(t, action)
+        agent.remember([state], action, reward, [next_state], done)
+        state = next_state
 
-            if done:
-                break
+        if len(agent.memory) > batch_size:
+            agent.replay(batch_size)
 
-            # Save to list
-            new_row = {'Time': df.iloc[t]['Time'], 'Throughput': df.iloc[t]['Throughput'],
-                       'Latency': df.iloc[t]['Latency'], 'CPU Usage': df.iloc[t]['CPU Usage'], 
-                       'Memory Usage': df.iloc[t]['Memory Usage'], 'num_vms': env.num_vms}
-            result_data.append(new_row)
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return
+        if done:
+            print("Reached the end of the dataset.")
+            break
+
+        # Save to list
+        new_row = {'Time': df.iloc[t]['Time'], 'Throughput': df.iloc[t]['Throughput'],
+                   'Latency': df.iloc[t]['Latency'], 'CPU Usage': df.iloc[t]['CPU Usage'], 
+                   'Memory Usage': df.iloc[t]['Memory Usage'], 'num_vms': env.num_vms}
+        result_data.append(new_row)
 
     result_df = pd.DataFrame(result_data)
     result_df.to_csv('updated_system_metrics.csv', index=False)
@@ -120,3 +120,4 @@ def run():
 
 if __name__ == '__main__':
     run()
+

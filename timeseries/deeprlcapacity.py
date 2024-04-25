@@ -6,6 +6,7 @@ from tensorflow.keras.optimizers import Adam
 from collections import deque
 import random
 import math
+import time
 
 # Load the dataset
 df = pd.read_csv('system_metrics.csv')
@@ -78,16 +79,22 @@ class DQNAgent:
             target_f = self.model.predict(np.array([state]))
             target_f[0][action] = target
             self.model.fit(np.array([state]), target_f, epochs=1, verbose=0)
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
+            if self.epsilon > self.epsilon_min:
+                self.epsilon *= self.epsilon_decay
 
 def run():
     env = Environment(df)
-    agent = DQNAgent(state_size=1, action_size=3)  # state size 1 as we only pass the number of VMs
+    agent = DQNAgent(state_size=1, action_size=3)
     batch_size = 32
-    result_df = pd.DataFrame(columns=['Time', 'Throughput', 'Latency', 'CPU Usage', 'Memory Usage', 'num_vms'])
+    result_data = []
+    start_time = time.time()
+    max_steps = len(df) - 1  # Set a maximum number of steps to the length of the dataset
 
-    for t in range(len(df) - 1):
+    for t in range(max_steps):
+        if t % 100 == 0:  # Print progress every 100 steps
+            elapsed_time = time.time() - start_time
+            print(f"Processing step {t+1}/{max_steps}. Time elapsed: {elapsed_time:.2f} seconds.")
+
         state = env.num_vms
         action = agent.act([state])
         next_state, reward, done, load, latency = env.step(t, action)
@@ -98,16 +105,18 @@ def run():
             agent.replay(batch_size)
 
         if done:
+            print("Reached the end of the dataset.")
             break
 
-        # Save to dataframe
-        new_row = {'Time': df.iloc[t + 1]['Time'], 'Throughput': load, 'Latency': latency,
-                   'CPU Usage': df.iloc[t + 1]['CPU Usage'], 'Memory Usage': df.iloc[t + 1]['Memory Usage'],
-                   'num_vms': env.num_vms}
-        new_row_df = pd.DataFrame([new_row])
-        result_df = pd.concat([result_df, new_row_df], ignore_index=True)
+        # Save to list
+        new_row = {'Time': df.iloc[t]['Time'], 'Throughput': df.iloc[t]['Throughput'],
+                   'Latency': df.iloc[t]['Latency'], 'CPU Usage': df.iloc[t]['CPU Usage'], 
+                   'Memory Usage': df.iloc[t]['Memory Usage'], 'num_vms': env.num_vms}
+        result_data.append(new_row)
 
+    result_df = pd.DataFrame(result_data)
     result_df.to_csv('updated_system_metrics.csv', index=False)
+    print("Simulation complete. Results saved to 'updated_system_metrics.csv'.")
 
 if __name__ == '__main__':
     run()

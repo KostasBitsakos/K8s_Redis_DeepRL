@@ -79,36 +79,42 @@ class DQNAgent:
             target_f = self.model.predict(np.array([state]))
             target_f[0][action] = target
             self.model.fit(np.array([state]), target_f, epochs=1, verbose=0)
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
+            if self.epsilon > self.epsilon_min:
+                self.epsilon *= self.epsilon_decay
 
 def run():
     env = Environment(df)
-    agent = DQNAgent(state_size=1, action_size=3)  # state size 1 as we only pass the number of VMs
+    agent = DQNAgent(state_size=1, action_size=3)
     batch_size = 32
-    result_df = pd.DataFrame(columns=['Time', 'Throughput', 'Latency', 'CPU Usage', 'Memory Usage', 'num_vms'])
+    result_data = []
     start_time = time.time()
 
-    for t in range(len(df) - 1):
-        print(f"Processing step {t+1}/{len(df)-1}. Time elapsed: {time.time() - start_time:.2f} seconds.")
-        state = env.num_vms
-        action = agent.act([state])
-        next_state, reward, done, load, latency = env.step(t, action)
-        agent.remember([state], action, reward, [next_state], done)
-        state = next_state
+    try:
+        for t in range(len(df) - 1):
+            if t % 100 == 0:
+                print(f"Processing step {t+1}/{len(df)-1}. Time elapsed: {time.time() - start_time:.2f} seconds.")
+            state = env.num_vms
+            action = agent.act([state])
+            next_state, reward, done, load, latency = env.step(t, action)
+            agent.remember([state], action, reward, [next_state], done)
+            state = next_state
 
-        if len(agent.memory) > batch_size:
-            agent.replay(batch_size)
+            if len(agent.memory) > batch_size:
+                agent.replay(batch_size)
 
-        if done:
-            break
+            if done:
+                break
 
-        # Save to dataframe
-        new_row = {'Time': df.iloc[t]['Time'], 'Throughput': df.iloc[t]['Throughput'],
-                   'Latency': df.iloc[t]['Latency'], 'CPU Usage': df.iloc[t]['CPU Usage'], 
-                   'Memory Usage': df.iloc[t]['Memory Usage'], 'num_vms': env.num_vms}
-        result_df = result_df.append(new_row, ignore_index=True)
+            # Save to list
+            new_row = {'Time': df.iloc[t]['Time'], 'Throughput': df.iloc[t]['Throughput'],
+                       'Latency': df.iloc[t]['Latency'], 'CPU Usage': df.iloc[t]['CPU Usage'], 
+                       'Memory Usage': df.iloc[t]['Memory Usage'], 'num_vms': env.num_vms}
+            result_data.append(new_row)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return
 
+    result_df = pd.DataFrame(result_data)
     result_df.to_csv('updated_system_metrics.csv', index=False)
     print("Simulation complete. Results saved to 'updated_system_metrics.csv'.")
 

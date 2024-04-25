@@ -5,7 +5,6 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 from collections import deque
 import random
-import math
 import time
 
 # Load the dataset
@@ -37,9 +36,25 @@ class Environment:
 
         next_load = self.load(t + 1)
         next_capacity = self.capacity(t + 1, self.num_vms)
-        reward = min(next_capacity, next_load) - 3 * self.num_vms
+        next_latency = self.latency(t + 1)
+
+        # Reward function that considers load, capacity, and latency
+        reward = 0
+        if next_load > next_capacity:
+            # Penalize if load exceeds capacity
+            reward -= (next_load - next_capacity) * 2
+        else:
+            # Reward for having sufficient capacity
+            reward += (next_capacity - next_load)
+
+        # Penalize based on latency
+        reward -= next_latency * 2
+
+        # Adjust the reward based on the number of VMs
+        reward -= self.num_vms
+
         done = t == len(self.data) - 2
-        return self.num_vms, reward, done, next_load, self.latency(t + 1)
+        return self.num_vms, reward, done, next_load, next_latency
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
@@ -79,8 +94,8 @@ class DQNAgent:
             target_f = self.model.predict(np.array([state]))
             target_f[0][action] = target
             self.model.fit(np.array([state]), target_f, epochs=1, verbose=0)
-            if self.epsilon > self.epsilon_min:
-                self.epsilon *= self.epsilon_decay
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
 
 def run():
     env = Environment(df)
@@ -89,6 +104,7 @@ def run():
     result_data = []
     start_time = time.time()
     max_steps = len(df) - 1  # Set a maximum number of steps to the length of the dataset
+    total_reward = 0  # Initialize total reward
 
     for t in range(max_steps):
         if t % 100 == 0:  # Print progress every 100 steps
@@ -98,6 +114,7 @@ def run():
         state = env.num_vms
         action = agent.act([state])
         next_state, reward, done, load, latency = env.step(t, action)
+        total_reward += reward  # Accumulate the reward
         agent.remember([state], action, reward, [next_state], done)
         state = next_state
 
@@ -115,8 +132,9 @@ def run():
         result_data.append(new_row)
 
     result_df = pd.DataFrame(result_data)
-    result_df.to_csv('updated_system_metrics.csv', index=False)
+    result_df.to_csv('updated5_system_metrics.csv', index=False)
     print("Simulation complete. Results saved to 'updated_system_metrics.csv'.")
+    print(f"Total reward accumulated over the simulation: {total_reward}")  # Print total reward
 
 if __name__ == '__main__':
     run()

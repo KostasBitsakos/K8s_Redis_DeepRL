@@ -117,10 +117,9 @@ def run():
     max_steps = len(df) - sequence_length  # Adjusted for sequence length
 
     for t in range(0, max_steps):
-        # Update to create a state sequence for LSTM input
-        state_sequence = np.array([env.load(i) for i in range(t, t + sequence_length)]).reshape((1, sequence_length, state_size))        
-        action = agent.act(state_sequence)
-        next_state_sequence = np.array([env.load(i) for i in range(t + 1, t + sequence_length + 1)]).reshape((1, sequence_length, state_size))
+        state_sequence = np.array([env.load(i) for i in range(t, t + sequence_length)]).reshape((1, sequence_length, 1))
+        action = agent.act(state_sequence)  # Pass 'state_sequence' directly to 'act'
+        next_state_sequence = np.array([env.load(i) for i in range(t + 1, t + sequence_length + 1)]).reshape((1, sequence_length, 1))
         _, reward, done, load, latency = env.step(t, action)
         agent.remember(state_sequence, action, reward, next_state_sequence, done)
 

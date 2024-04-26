@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, LSTM
 from tensorflow.keras.optimizers import Adam
 from collections import deque
 import random
@@ -57,9 +57,10 @@ class Environment:
         return self.num_vms, reward, done, next_load, next_latency
 
 class DQNAgent:
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, sequence_length):
         self.state_size = state_size
         self.action_size = action_size
+        self.sequence_length = sequence_length
         self.memory = deque(maxlen=2000)
         self.gamma = 0.95    # discount rate
         self.epsilon = 1.0   # exploration rate
@@ -70,11 +71,12 @@ class DQNAgent:
 
     def _build_model(self):
         model = Sequential()
-        model.add(Dense(24, input_dim=self.state_size, activation='relu'))
-        model.add(Dense(24, activation='relu'))
+        model.add(LSTM(24, input_shape=(self.sequence_length, self.state_size), activation='relu', return_sequences=True))
+        model.add(LSTM(12, activation='relu', return_sequences=False))
         model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(learning_rate=self.learning_rate))
+        model.compile(loss='mean_absolute_error', optimizer=Adam(learning_rate=self.learning_rate))
         return model
+
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -90,33 +92,37 @@ class DQNAgent:
         for state, action, reward, next_state, done in minibatch:
             target = reward
             if not done:
-                target = (reward + self.gamma * np.amax(self.model.predict(np.array([next_state]))[0]))
-            target_f = self.model.predict(np.array([state]))
+                # Reshape next_state to match the expected input shape of the model
+                next_state = next_state.reshape((1, self.sequence_length, self.state_size))
+                target = (reward + self.gamma * np.amax(self.model.predict(next_state)[0]))
+            # Reshape state to match the expected input shape of the model
+            state = state.reshape((1, self.sequence_length, self.state_size))
+            target_f = self.model.predict(state)
             target_f[0][action] = target
-            self.model.fit(np.array([state]), target_f, epochs=1, verbose=0)
+            self.model.fit(state, target_f, epochs=1, verbose=0)
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
+
 def run():
+    sequence_length = 16  # The sequence length for LSTM input
+    state_size = 1  # Assuming a 1D state representation for simplicity
+    action_size = 3  # Number of possible actions
+
     env = Environment(df)
-    agent = DQNAgent(state_size=1, action_size=3)
+    agent = DQNAgent(state_size, action_size, sequence_length)
     batch_size = 32
     result_data = []
     start_time = time.time()
-    max_steps = len(df) - 1  # Set a maximum number of steps to the length of the dataset
-    total_reward = 0  # Initialize total reward
+    max_steps = len(df) - sequence_length  # Adjusted for sequence length
 
-    for t in range(max_steps):
-        if t % 100 == 0:  # Print progress every 100 steps
-            elapsed_time = time.time() - start_time
-            print(f"Processing step {t+1}/{max_steps}. Time elapsed: {elapsed_time:.2f} seconds.")
-
-        state = env.num_vms
-        action = agent.act([state])
-        next_state, reward, done, load, latency = env.step(t, action)
-        total_reward += reward  # Accumulate the reward
-        agent.remember([state], action, reward, [next_state], done)
-        state = next_state
+    for t in range(0, max_steps):
+        # Update to create a state sequence for LSTM input
+        state_sequence = np.array([env.load(i) for i in range(t, t + sequence_length)]).reshape((1, sequence_length, state_size))        
+        action = agent.act(state_sequence)
+        next_state_sequence = np.array([env.load(i) for i in range(t + 1, t + sequence_length + 1)]).reshape((1, sequence_length, state_size))
+        _, reward, done, load, latency = env.step(t, action)
+        agent.remember(state_sequence, action, reward, next_state_sequence, done)
 
         if len(agent.memory) > batch_size:
             agent.replay(batch_size)
@@ -124,6 +130,7 @@ def run():
         if done:
             print("Reached the end of the dataset.")
             break
+
 
         # Save to list
         new_row = {'Time': df.iloc[t]['Time'], 'Throughput': df.iloc[t]['Throughput'],

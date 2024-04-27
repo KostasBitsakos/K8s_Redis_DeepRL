@@ -13,14 +13,21 @@ colors = ['blue', 'green', 'red', 'purple']  # Different color for each plot
 
 for i, metric in enumerate(metrics):
     axes[i].plot(df['Time'], df[metric], label=metric, color=colors[i])
-    axes[i].scatter(df['Time'], df['num_vms'], color='black', label='num_vms', alpha=0.1)  # num_vms as dots
     axes[i].set_ylabel(metric)
     axes[i].legend(loc='upper right')
+
+    # Create a twin y-axis for num_vms
+    ax_vm = axes[i].twinx()
+    ax_vm.scatter(df['Time'], df['num_vms'], color='black', label='num_vms', alpha=0.1)
+    ax_vm.set_ylabel('Number of VMs')
+    ax_vm.grid(False)  # Disable grid for the num_vms axis
 
 # Set common labels
 plt.xlabel('Time')
 plt.tight_layout()
 
-# Save the plot as a PNG file
-plt.savefig('metrics_plots.png')
+# Save the plots as PNG files
+for i, metric in enumerate(metrics):
+    plt.savefig(f'{metric}_plot.png')
+
 plt.show()

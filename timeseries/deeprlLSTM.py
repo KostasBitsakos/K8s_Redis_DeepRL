@@ -68,15 +68,14 @@ class DQNAgent:
         self.epsilon_decay = 0.995
         self.learning_rate = 0.001
         self.model = self._build_model()
-
     def _build_model(self):
         model = Sequential()
-        model.add(LSTM(24, input_shape=(self.sequence_length, self.state_size), activation='relu', return_sequences=True))
-        model.add(LSTM(12, activation='relu', return_sequences=False))
+        model.add(LSTM(64, input_shape=(self.sequence_length, self.state_size), activation='relu', return_sequences=True))
+        model.add(LSTM(128, activation='relu', return_sequences=True))  # Changed LSTM layer with more neurons
+        model.add(LSTM(64, activation='relu', return_sequences=False))  # Changed LSTM layer with more neurons
         model.add(Dense(self.action_size, activation='linear'))
         model.compile(loss='mean_squared_error', optimizer=Adam(learning_rate=self.learning_rate))
         return model
-
 
 
     def remember(self, state, action, reward, next_state, done):
@@ -90,7 +89,6 @@ class DQNAgent:
         act_values = self.model.predict(state)
         return np.argmax(act_values[0])
 
-
     def replay(self, batch_size):
         minibatch = random.sample(self.memory, batch_size)
         for state, action, reward, next_state, done in minibatch:
@@ -101,12 +99,12 @@ class DQNAgent:
                 next_state = np.reshape(next_state, (next_state.shape[0], self.sequence_length, self.state_size))
                 target = (reward + self.gamma * np.amax(self.model.predict(next_state)[0]))
 
-        # Reshape state to match the expected input shape of the model
-            state = np.array([state])
-            state = np.reshape(state, (state.shape[0], self.sequence_length, self.state_size))
-            target_f = self.model.predict(state)
-            target_f[0][action] = target
-            self.model.fit(state, target_f, epochs=1, verbose=0)
+                # Reshape state to match the expected input shape of the model
+                state = np.array([state])
+                state = np.reshape(state, (state.shape[0], self.sequence_length, self.state_size))
+                target_f = self.model.predict(state)
+                target_f[0][action] = target
+                self.model.fit(state, target_f, epochs=1, verbose=0)
 
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
@@ -123,6 +121,7 @@ def run():
     result_data = []
     start_time = time.time()
     max_steps = len(df) - sequence_length  # Adjusted for sequence length
+    total_reward = 0  # Initialize total reward accumulator
 
     for t in range(0, max_steps):
         if t % 100 == 0:  # Print progress every 100 steps
@@ -139,7 +138,8 @@ def run():
         next_state_sequence = np.array([env.load(i) for i in range(t + 1, t + sequence_length + 1)]).reshape((1, sequence_length, state_size))
 
         # Perform the step and update the agent's memory
-        _, reward, done, load, latency = env.step(t, action)
+        num_vms, reward, done, load, latency = env.step(t, action)
+        total_reward += reward  # Accumulate total reward
         agent.remember(state_sequence, action, reward, next_state_sequence, done)
 
         if len(agent.memory) > batch_size:
@@ -149,16 +149,14 @@ def run():
             print("Reached the end of the dataset.")
             break
 
-
-
         # Save to list
         new_row = {'Time': df.iloc[t]['Time'], 'Throughput': df.iloc[t]['Throughput'],
                    'Latency': df.iloc[t]['Latency'], 'CPU Usage': df.iloc[t]['CPU Usage'], 
-                   'Memory Usage': df.iloc[t]['Memory Usage'], 'num_vms': env.num_vms}
+                   'Memory Usage': df.iloc[t]['Memory Usage'], 'num_vms': num_vms}
         result_data.append(new_row)
 
     result_df = pd.DataFrame(result_data)
-    result_df.to_csv('updated5_system_metrics.csv', index=False)
+    result_df.to_csv('updated6_system_metrics.csv', index=False)
     print("Simulation complete. Results saved to 'updated_system_metrics.csv'.")
     print(f"Total reward accumulated over the simulation: {total_reward}")  # Print total reward
 

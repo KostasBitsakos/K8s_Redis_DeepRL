@@ -50,7 +50,7 @@ class Environment:
         next_capacity = self.capacity(self.time)
         reward = min(next_capacity, next_load) - 3 * self.num_vms
 
-        return self.num_vms, next_load, reward, self.cpu_usage(self.time), self.memory_usage(self.time), self.latency(self.time), self.read_percentage(self.time)
+        return self.num_vms, next_load, reward
 
 
 # Define the Double DQN Agent
@@ -110,20 +110,17 @@ class DDQNAgent:
 
         self.update_target_model()
 
-
 def train_agent(train_steps, max_episodes_per_step=1000):
-    sequence_length = 10  # The sequence length for LSTM input
-    state_size = 7  # Throughput, Load, CPU Usage, Memory Usage, Latency, Number of VMs, Read Percentage
-    action_size = 3  # Number of possible actions
-
     env = Environment()
-    agent = DDQNAgent(state_size, action_size, sequence_length)  # Pass sequence_length here
+    state_size = 5
+    action_size = 3
+    sequence_length = 10
     batch_size = 32
-    result_data = []
+    agent = DDQNAgent(state_size, action_size, sequence_length)
 
-    total_reward = 0
-    episodes = 0
-    for step in range(train_steps):
+    rewards = []
+
+    for _ in range(train_steps):
         state = np.zeros((sequence_length, state_size))
         for t in range(sequence_length):
             state[t][0] = env.load(env.time + t)
@@ -131,25 +128,21 @@ def train_agent(train_steps, max_episodes_per_step=1000):
             state[t][2] = env.cpu_usage(env.time + t)
             state[t][3] = env.memory_usage(env.time + t)
             state[t][4] = env.latency(env.time + t)
-            state[t][5] = env.num_vms
-            state[t][6] = env.read_percentage(env.time + t)
 
         done = False
         total_reward = 0
-        while not done and episodes < max_episodes_per_step:
+        while not done:
             action = agent.act(state)
-            num_vms, next_load, reward, cpu_usage, memory_usage, latency, read_percentage = env.step(action)
+            num_vms, next_load, reward = env.step(action)
             total_reward += reward
 
             next_state = np.zeros((sequence_length, state_size))
             next_state[:-1] = state[1:]
             next_state[-1][0] = next_load
-            next_state[-1][1] = read_percentage
-            next_state[-1][2] = cpu_usage
-            next_state[-1][3] = memory_usage
-            next_state[-1][4] = latency
-            next_state[-1][5] = num_vms
-            next_state[-1][6] = read_percentage
+            next_state[-1][1] = env.read_percentage(env.time + sequence_length)
+            next_state[-1][2] = env.cpu_usage(env.time + sequence_length)
+            next_state[-1][3] = env.memory_usage(env.time + sequence_length)
+            next_state[-1][4] = env.latency(env.time + sequence_length)
 
             agent.remember(state, action, reward, next_state, done)
             state = next_state
@@ -160,35 +153,32 @@ def train_agent(train_steps, max_episodes_per_step=1000):
             if num_vms == 1 and next_load == 1:  # Terminal state condition
                 done = True
 
-            episodes += 1
+        print(f"Total reward for training step {train_steps}: {total_reward}")
+        rewards.append(total_reward)
 
-        result_data.append({'Time': env.time, 'Throughput': state[-1][0], 'Latency': state[-1][4],
-                            'CPU Usage': state[-1][2], 'Memory Usage': state[-1][3], 'num_vms': num_vms})
+    with open(f"rewards_{train_steps}.txt", "w") as f:
+        for reward in rewards:
+            f.write(str(reward) + "\n")
 
-        if step % 100 == 0:
-            print(f"Training step {step}/{train_steps}. Total reward: {total_reward}")
-
-    result_df = pd.DataFrame(result_data)
-    result_df.to_csv(f'training_output_{train_steps}.csv', index=False)
-    print(f"Training completed for {train_steps} steps. Results saved to 'training_output_{train_steps}.csv'. Total reward: {total_reward}")
+    agent.online_model.save_weights(f'model_{train_steps}.h5')
+    print(f"Model for {train_steps} training steps saved to 'model_{train_steps}.h5'.")
+    print("Training completed.\n")
 
 
-def evaluate_agent(eval_steps, model_file):
-    sequence_length = 10  # The sequence length for LSTM input
-    state_size = 7  # Throughput, Load, CPU Usage, Memory Usage, Latency, Number of VMs, Read Percentage
-    action_size = 3  # Number of possible actions
-
+def evaluate_agent(eval_steps):
     env = Environment()
-    agent = DDQNAgent(state_size, action_size, sequence_length)  # Pass sequence_length here
+    state_size = 5
+    action_size = 3
+    sequence_length = 10
     batch_size = 32
+    agent = DDQNAgent(state_size, action_size, sequence_length)
+
+    agent.online_model.load_weights(f'model_{eval_steps}.h5')
+    print(f"Model for evaluation loaded from 'model_{eval_steps}.h5'.")
+
     result_data = []
 
-    # Load the model
-    agent.online_model.load_weights(model_file)
-    agent.update_target_model()
-
-    total_reward = 0
-    for _ in range(eval_steps):  # Run for the specified number of evaluation steps
+    for _ in range(max_episodes_per_step):
         state = np.zeros((sequence_length, state_size))
         for t in range(sequence_length):
             state[t][0] = env.load(env.time + t)
@@ -196,24 +186,21 @@ def evaluate_agent(eval_steps, model_file):
             state[t][2] = env.cpu_usage(env.time + t)
             state[t][3] = env.memory_usage(env.time + t)
             state[t][4] = env.latency(env.time + t)
-            state[t][5] = env.num_vms
-            state[t][6] = env.read_percentage(env.time + t)
 
         done = False
+        total_reward = 0
         while not done:
             action = agent.act(state)
-            num_vms, next_load, reward, cpu_usage, memory_usage, latency, read_percentage = env.step(action)
+            num_vms, next_load, reward = env.step(action)
             total_reward += reward
 
             next_state = np.zeros((sequence_length, state_size))
             next_state[:-1] = state[1:]
             next_state[-1][0] = next_load
-            next_state[-1][1] = read_percentage
-            next_state[-1][2] = cpu_usage
-            next_state[-1][3] = memory_usage
-            next_state[-1][4] = latency
-            next_state[-1][5] = num_vms
-            next_state[-1][6] = read_percentage
+            next_state[-1][1] = env.read_percentage(env.time + sequence_length)
+            next_state[-1][2] = env.cpu_usage(env.time + sequence_length)
+            next_state[-1][3] = env.memory_usage(env.time + sequence_length)
+            next_state[-1][4] = env.latency(env.time + sequence_length)
 
             state = next_state
 
@@ -224,20 +211,25 @@ def evaluate_agent(eval_steps, model_file):
                             'CPU Usage': state[-1][2], 'Memory Usage': state[-1][3], 'num_vms': num_vms})
 
     result_df = pd.DataFrame(result_data)
-    result_df.to_csv(f'evaluation_output_{eval_steps}_{model_file}.csv', index=False)
-    print(f"Evaluation completed using model '{model_file}'. Results saved to 'evaluation_output_{eval_steps}_{model_file}.csv'. Total reward: {total_reward}")
+    result_df.to_csv(f'output_{eval_steps}.csv', index=False)
+    print(f"Evaluation results saved to 'output_{eval_steps}.csv'.")
 
 
 if __name__ == '__main__':
     train_steps_list = [2000, 5000, 10000, 20000, 500000]
     eval_steps = 2000
+    max_episodes_per_step = 1000
 
     for train_steps in train_steps_list:
         print(f"Training for {train_steps} steps...")
-        train_agent(train_steps)
+        train_agent(train_steps, max_episodes_per_step)
         print("Training completed.\n")
 
-    print(f"Evaluating the trained agents for {eval_steps} steps...")
+    print("Training completed for all steps.\n")
+
     for train_steps in train_steps_list:
-        model_file = f'training_output_{train_steps}.h5'
-        evaluate_agent(eval_steps, model_file)
+        print(f"Evaluating using model trained with {train_steps} steps...")
+        evaluate_agent(train_steps)
+        print(f"Evaluation completed for model trained with {train_steps} steps.\n")
+
+    print("All evaluations completed.")

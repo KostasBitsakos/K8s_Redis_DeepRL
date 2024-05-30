@@ -1,21 +1,13 @@
 import warnings 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM
-from tensorflow.keras.optimizers import Adam
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from collections import deque
 import random
 
 # Define the environment
-import numpy as np
-
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-MAX_TIME_STEPS=10
-
 class Environment:
     def __init__(self):
         self.time = 0
@@ -72,17 +64,12 @@ class Environment:
         next_capacity = self.capacity(self.time)
         reward = min(next_capacity, next_load) - 3 * self.num_vms
 
-        done = False
-        if self.time >= MAX_TIME_STEPS:  # You need to define MAX_TIME_STEPS
-            done = True
-
-        return self.num_vms, next_load, reward, done
-
-
+        return self.num_vms, next_load, reward
 
 # Define the Double DQN Agent
-class DDQNAgent:
+class DDQNAgent(nn.Module):
     def __init__(self, state_size, action_size, sequence_length):
+        super(DDQNAgent, self).__init__()
         self.state_size = state_size
         self.action_size = action_size
         self.sequence_length = sequence_length
@@ -97,16 +84,20 @@ class DDQNAgent:
         self.update_target_model()
 
     def _build_model(self):
-        model = Sequential()
-        model.add(LSTM(64, input_shape=(self.sequence_length, self.state_size), activation='relu', return_sequences=True))
-        model.add(LSTM(128, activation='relu', return_sequences=True))
-        model.add(LSTM(64, activation='relu', return_sequences=False))
-        model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mean_squared_error', optimizer=Adam(learning_rate=self.learning_rate))
+        model = nn.Sequential(
+            nn.LSTM(input_size=self.state_size, hidden_size=64, num_layers=1, batch_first=True),
+            nn.ReLU(),
+            nn.LSTM(input_size=64, hidden_size=128, num_layers=1, batch_first=True),
+            nn.ReLU(),
+            nn.LSTM(input_size=128, hidden_size=64, num_layers=1, batch_first=True),
+            nn.ReLU(),
+            nn.Linear(64, self.action_size)
+        )
         return model
 
+
     def update_target_model(self):
-        self.target_model.set_weights(self.online_model.get_weights())
+        self.target_model.load_state_dict(self.online_model.state_dict())
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -114,26 +105,34 @@ class DDQNAgent:
     def act(self, state, verbose=False):
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
-        state = np.array(state)
-        state = np.reshape(state, (1, self.sequence_length, self.state_size))
-        act_values = self.online_model.predict(state, verbose=verbose)
-        return np.argmax(act_values[0])
-
+        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        act_values = self.online_model(state)
+        return torch.argmax(act_values[0]).item()
 
     def replay(self, batch_size):
         minibatch = random.sample(self.memory, batch_size)
+        loss_fn = nn.MSELoss()
+        optimizer = optim.Adam(self.online_model.parameters(), lr=self.learning_rate)
+        
         for state, action, reward, next_state, done in minibatch:
             target = reward
             if not done:
-                next_state = np.array([next_state])
-                next_state = np.reshape(next_state, (1, self.sequence_length, self.state_size))
-                target = (reward + self.gamma * np.amax(self.target_model.predict(next_state, verbose=0)[0]))
+                next_state = torch.tensor(next_state, dtype=torch.float32).unsqueeze(0)
+                output_shape = self.target_model(next_state).shape  # Get the output shape
+                print("Output shape:", output_shape)  # Print the output shape
+                #starget = (reward + self.gamma * torch.max(self.target_model(next_state)[0], dim=1)[0].item())
 
-            state = np.array([state])
-            state = np.reshape(state, (1, self.sequence_length, self.state_size))
-            target_f = self.online_model.predict(state,verbose=0)
+
+
+            state = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+            target_f = self.online_model(state)
             target_f[0][action] = target
-            self.online_model.fit(state, target_f, epochs=1, verbose=0)
+            
+            optimizer.zero_grad()
+            loss = loss_fn(target_f, target)
+            loss.backward()
+            optimizer.step()
+
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
@@ -162,7 +161,7 @@ def train_agent(train_steps, max_episodes_per_step=1000):
             for _ in range(max_episodes_per_step):
                 action = agent.act(state, verbose=0)
 
-                num_vms, next_load, reward, done = env.step(action)
+                num_vms, next_load, reward = env.step(action)
                 total_reward += reward
 
                 next_state = np.zeros((sequence_length, state_size))
@@ -201,8 +200,8 @@ def train_agent(train_steps, max_episodes_per_step=1000):
         for reward in rewards:
             f.write(str(reward) + "\n")
 
-    agent.online_model.save_weights(f'model_{train_steps}.weights.h5')
-    print(f"Model for {train_steps} training steps saved to 'model_{train_steps}.h5'.")
+    torch.save(agent.online_model.state_dict(), f'model_{train_steps}.weights.pth')
+    print(f"Model for {train_steps} training steps saved to 'model_{train_steps}.weights.pth'.")
     print("Training completed.\n")
 
 
@@ -213,10 +212,9 @@ def evaluate_agent(eval_steps, max_episodes_per_step=1000):
     sequence_length = 10
     batch_size = 16
     agent = DDQNAgent(state_size, action_size, sequence_length)
+    agent.online_model.load_state_dict(torch.load(f'model_{eval_steps}.weights.pth'))
 
-    agent.online_model.load_weights(f'model_{eval_steps}.weights.h5')
-
-    print(f"Model for evaluation loaded from 'model_{eval_steps}.h5'.")
+    print(f"Model for evaluation loaded from 'model_{eval_steps}.weights.pth'.")
 
     result_data = []
     
@@ -232,7 +230,7 @@ def evaluate_agent(eval_steps, max_episodes_per_step=1000):
             while not done:
                 action = agent.act(state, verbose=0)
 
-                num_vms, next_load, reward , done= env.step(action)
+                num_vms, next_load, reward = env.step(action)
                 total_reward += reward
 
                 next_state = np.zeros((sequence_length, state_size))
@@ -279,4 +277,3 @@ if __name__ == '__main__':
         print(f"Evaluation completed for model trained with {train_steps} steps.\n")
 
     print("All evaluations completed.")
-

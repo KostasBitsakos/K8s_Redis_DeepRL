@@ -85,7 +85,7 @@ class Environment:
 
     # Assemble the next state
         next_state = np.array([next_load, next_capacity, next_cpu_usage, next_memory_usage, next_latency])
-
+        print(next_state)
     # Check if the episode is done
         done = self.time >= 5000  # or some other condition that defines an end of an episode
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     env_cpu = [env.cpu_usage(t) for t in time_steps]
     env_memory = [env.memory_usage(t) for t in time_steps]
     env_latency = [env.latency(t) for t in time_steps]
-
+    env.step(0)
     plt.figure(figsize=(10, 8))
 
     plt.subplot(3, 2, 1)
@@ -160,3 +160,4 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig('metrics.png')
     plt.show()
+   

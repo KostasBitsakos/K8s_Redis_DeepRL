@@ -35,8 +35,10 @@ class DDQNAgent:
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
         state = np.array(state)
+        print(state)
+        print("here")
         state = np.reshape(state, (1, self.sequence_length, self.state_size))
-
+        print(state)
         state = torch.tensor(state, dtype=torch.float32)
 
         self.online_model.eval()
@@ -85,3 +87,8 @@ class DDQNAgent:
 
         self.update_target_model()
 
+if __name__ == "__main__":
+    agent=DDQNAgent(5,2,10)
+    arr = np.arange(50)
+
+    agent.act(arr)

@@ -3,6 +3,8 @@ import pandas as pd
 # Define the environment
 from environment import Environment
 from ddqn import DDQNAgent
+import matplotlib.pyplot as plt
+
 
 
 def train_agent(train_steps, max_episodes_per_step=1000):
@@ -14,6 +16,11 @@ def train_agent(train_steps, max_episodes_per_step=1000):
     agent = DDQNAgent(state_size, action_size, sequence_length)
 
     rewards = []
+    episode_loads = []
+    episode_read_percentages = []
+    episode_mem_usages = []
+    episode_cpu_usages = []
+    episode_num_vms = []
 
     for _ in range(train_steps):
         state = np.zeros((sequence_length, state_size))
@@ -60,6 +67,11 @@ def train_agent(train_steps, max_episodes_per_step=1000):
                     break  # Exit the loop when termination condition is met
 
             rewards.append(total_reward)
+            episode_loads.append(episode_load)
+            episode_read_percentages.append(episode_read_percentage)
+            episode_mem_usages.append(episode_mem_usage)
+            episode_cpu_usages.append(episode_cpu_usage)
+            episode_num_vms.append(episode_num_vm)
             if done:
                 break  # Exit the outer loop when termination condition is met
 
@@ -70,6 +82,8 @@ def train_agent(train_steps, max_episodes_per_step=1000):
     agent.online_model.save_weights(f'model_{train_steps}.weights.h5')
     print(f"Model for {train_steps} training steps saved to 'model_{train_steps}.h5'.")
     print("Training completed.\n")
+    return episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms
+
 
 def evaluate_agent(train_steps):
     env = Environment()
@@ -83,6 +97,11 @@ def evaluate_agent(train_steps):
     agent.online_model.load_weights(f'model_{train_steps}.weights.h5')
 
     total_rewards = []
+    episode_load = []
+    episode_read_percentage = []
+    episode_mem_usage = []
+    episode_cpu_usage = []
+    episode_num_vm = []
 
     for _ in range(eval_steps):
         state = np.zeros((sequence_length, state_size))
@@ -90,6 +109,7 @@ def evaluate_agent(train_steps):
 
         done = False
         while not done:
+            
             action = agent.act(state, verbose=0)
 
             num_vms, next_load, reward = env.step(action)
@@ -109,10 +129,15 @@ def evaluate_agent(train_steps):
                 done = True
 
         total_rewards.append(total_reward)
+        episode_loads.append(episode_load)
+        episode_read_percentages.append(episode_read_percentage)
+        episode_mem_usages.append(episode_mem_usage)
+        episode_cpu_usages.append(episode_cpu_usage)
+        episode_num_vms.append(episode_num_vm)
 
     avg_reward = np.mean(total_rewards)
     print(f"Avg. reward for model trained with {train_steps} steps: {avg_reward}")
-
+    return episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms
 
 def plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms):
     # Plotting metrics
@@ -170,6 +195,9 @@ if __name__ == '__main__':
 
     for train_steps in train_steps_list:
         print(f"Evaluating using model trained with {train_steps} steps...")
+        episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms = evaluate_agent(train_steps)
+        plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usage, episode_num_vms)
+
         evaluate_agent(train_steps)
         plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms)
 

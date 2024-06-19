@@ -163,7 +163,7 @@ def evaluate_agent(agent, eval_steps):
             idx += 1
             action = agent.act(state, verbose=0)
 
-            num_vms, next_load, reward = env.step(action)
+            new_state, reward, done = env.step(action)
             total_reward += reward
 
             next_state = np.zeros((sequence_length, state_size))

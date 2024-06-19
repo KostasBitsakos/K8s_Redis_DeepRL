@@ -20,6 +20,7 @@ def train_agent(train_steps, max_episodes_per_step=1000):
     episode_read_percentages = []
     episode_mem_usages = []
     episode_cpu_usages = []
+    episode_latencies=[]
     episode_num_vms = []
 
     for _ in range(train_steps):
@@ -33,6 +34,7 @@ def train_agent(train_steps, max_episodes_per_step=1000):
         episode_read_percentage = []
         episode_mem_usage = []
         episode_cpu_usage = []
+        episode_latency=[]
         episode_num_vm = []
         
         done = False  # Initialize done outside the loop
@@ -44,37 +46,39 @@ def train_agent(train_steps, max_episodes_per_step=1000):
 
                 new_state, reward, done = env.step(action)
                 total_reward += reward
-                print("here")
-                print(new_state)
-                print("Shape of next_state:", new_state.shape)
+                # print("here")
+                # print(new_state)
+                # print("Shape of next_state:", new_state.shape)
 
+                # next_state = np.zeros((sequence_length, state_size))
+                # next_state[:-1] = state[1:]
+                # next_state[-1][0] = env.load(env.time + sequence_length)
+                # next_state[-1][1] = env.read_percentage(env.time + sequence_length)
+                # next_state[-1][2] = env.cpu_usage(env.time + sequence_length)
+                # next_state[-1][3] = env.memory_usage(env.time + sequence_length)
+                # next_state[-1][4] = env.latency(env.time + sequence_length)
+                
+                # print(next_state)
+                
+                
                 next_state = np.zeros((sequence_length, state_size))
                 next_state[:-1] = state[1:]
-                next_state[-1][0] = env.load(env.time + sequence_length)
-                next_state[-1][1] = env.read_percentage(env.time + sequence_length)
-                next_state[-1][2] = env.cpu_usage(env.time + sequence_length)
-                next_state[-1][3] = env.memory_usage(env.time + sequence_length)
-                next_state[-1][4] = env.latency(env.time + sequence_length)
-                
-                print(next_state)
-                
-                
-                # next_state = np.zeros((sequence_length, state_size))
-                # next_state[:-1] = new_state[1:]
-                # next_state[-1][0] = new_state[0]
-                # next_state[-1][1] = new_state[1]
-                # next_state[-1][2] = new_state[2]
-                # next_state[-1][3] = new_state[3]
-                # next_state[-1][4] = new_state[4]
-                # next_state[-1][5] = new_state[5]
+                next_state[-1][0] = new_state[0]
+                next_state[-1][1] = new_state[1]
+                next_state[-1][2] = new_state[2]
+                next_state[-1][3] = new_state[3]
+                next_state[-1][4] = new_state[4]
+                next_state[-1][5] = new_state[5]
 
-
+                #print(next_state)
                 agent.remember(state, action, reward, next_state, done)
 
                 episode_load.append(next_state[-1][0])
                 episode_read_percentage.append(next_state[-1][1])
                 episode_mem_usage.append(next_state[-1][2])
                 episode_cpu_usage.append(next_state[-1][3])
+                episode_latency.append(next_state[-1][4])
+
                 episode_num_vm.append(next_state[-1][5])
 
                 state = next_state
@@ -107,6 +111,7 @@ def train_agent(train_steps, max_episodes_per_step=1000):
             episode_read_percentages.append(episode_read_percentage)
             episode_mem_usages.append(episode_mem_usage)
             episode_cpu_usages.append(episode_cpu_usage)
+            episode_latencies.append(episode_latency)
             episode_num_vms.append(episode_num_vm)
             if done:
                 break  # Exit the outer loop when termination condition is met
@@ -119,12 +124,12 @@ def train_agent(train_steps, max_episodes_per_step=1000):
     agent.save_model(f'model_{train_steps}.pth')
     # print(f"Model for {train_steps} training steps saved to 'model_{train_steps}.h5'.")
     # print("Training completed.\n")
-    return episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms
+    return episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms
 
 
 def evaluate_agent(agent, eval_steps):
     env = Environment()
-    state_size = 5
+    state_size = 6  # Adjusted state size to include latency
     action_size = 3
     sequence_length = 10
     batch_size = 16
@@ -138,6 +143,7 @@ def evaluate_agent(agent, eval_steps):
     episode_read_percentages = []
     episode_mem_usages = []
     episode_cpu_usages = []
+    episode_latencies = []  # Added to store latency values
     episode_num_vms = []
 
     for _ in range(1):
@@ -148,58 +154,60 @@ def evaluate_agent(agent, eval_steps):
         episode_read_percentage = []
         episode_mem_usage = []
         episode_cpu_usage = []
+        episode_latency = []  # Added to store latency values
         episode_num_vm = []
 
-
-
         done = False
-        idx = 0 
+        idx = 0
         while not done:
             idx += 1
-            # print('Processing %d' % idx)
             action = agent.act(state, verbose=0)
 
             num_vms, next_load, reward = env.step(action)
-            # print(reward)
             total_reward += reward
 
             next_state = np.zeros((sequence_length, state_size))
             next_state[:-1] = state[1:]
-            next_state[-1][0] = next_load
-            next_state[-1][1] = env.read_percentage(env.time + sequence_length)
-            next_state[-1][2] = env.cpu_usage(env.time + sequence_length)
-            next_state[-1][3] = env.memory_usage(env.time + sequence_length)
-            next_state[-1][4] = env.latency(env.time + sequence_length)
+            next_state[-1][0] = new_state[0]
+            next_state[-1][1] = new_state[1]
+            next_state[-1][2] = new_state[2]
+            next_state[-1][3] = new_state[3]
+            next_state[-1][4] = new_state[4]
+            next_state[-1][5] = new_state[5]
 
+            #print(next_state)
+            agent.remember(state, action, reward, next_state, done)
 
             episode_load.append(next_state[-1][0])
             episode_read_percentage.append(next_state[-1][1])
             episode_mem_usage.append(next_state[-1][2])
             episode_cpu_usage.append(next_state[-1][3])
-            episode_num_vm.append(num_vms)
+            episode_latency.append(next_state[-1][4])
+
+            episode_num_vm.append(next_state[-1][5])
 
             state = next_state
 
             if idx > eval_steps:
                 break
 
-            # if total_reward <= -200:  # Terminate if total reward is less than or equal to -200
-                # done = True
-        # print(total_reward)
         total_rewards.append(total_reward)
         episode_loads.append(episode_load)
         episode_read_percentages.append(episode_read_percentage)
         episode_mem_usages.append(episode_mem_usage)
         episode_cpu_usages.append(episode_cpu_usage)
+        episode_latencies.append(episode_latency)  # Append latency episodes
         episode_num_vms.append(episode_num_vm)
 
     avg_reward = np.mean(total_rewards)
     print(f"Avg. reward for model trained with {train_steps} steps: {avg_reward}")
-    return episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms
+    
+    return episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms
 
-def plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms):
+
+def plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms):
     # Plotting metrics
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(12, 10))
 
     plt.subplot(3, 2, 1)
     for episode_load in episode_loads:
@@ -230,6 +238,13 @@ def plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, ep
     plt.title('CPU Usage Over Time')
 
     plt.subplot(3, 2, 5)
+    for episode_latency in episode_latencies:
+        plt.plot(range(len(episode_latency)), episode_latency, alpha=0.5)
+    plt.xlabel('Time')
+    plt.ylabel('Latency')
+    plt.title('Latency Over Time')
+
+    plt.subplot(3, 2, 6)
     for episode_num_vm in episode_num_vms:
         plt.plot(range(len(episode_num_vm)), episode_num_vm, alpha=0.5)
     plt.xlabel('Time')
@@ -239,6 +254,7 @@ def plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, ep
     plt.tight_layout()
     plt.show()
 
+
 if __name__ == '__main__':
     train_steps_list = [2000, 5000]
     eval_steps = 2000
@@ -246,20 +262,19 @@ if __name__ == '__main__':
 
     for train_steps in train_steps_list:
         print(f"Training for {train_steps} steps...")
-        train_agent(train_steps, max_episodes_per_step)
+        episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms = train_agent(train_steps, max_episodes_per_step)
         print("Training completed.\n")
 
     print("Training completed for all steps.\n")
 
     for train_steps in train_steps_list:
         print(f"Evaluating using model trained with {train_steps} steps...")
-        episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms = evaluate_agent(train_steps)
-        plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usage, episode_num_vms)
-
-        evaluate_agent(train_steps)
-        plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms)
+        episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms = evaluate_agent(agent, eval_steps)
+        plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms)
 
         print(f"Evaluation completed for model trained with {train_steps} steps.\n")
 
     print("All evaluations completed.")
+
+
 

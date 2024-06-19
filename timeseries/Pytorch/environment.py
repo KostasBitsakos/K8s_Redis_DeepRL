@@ -79,13 +79,15 @@ class Environment:
         next_cpu_usage = self.cpu_usage(self.time)
         next_memory_usage = self.memory_usage(self.time)
         next_latency = self.latency(self.time)
+        num_vms=self.num_vms
 
     # Calculate the reward
         reward = min(next_capacity, next_load) - 3 * self.num_vms
+        
 
     # Assemble the next state
-        next_state = np.array([next_load, next_capacity, next_cpu_usage, next_memory_usage, next_latency])
-        print(next_state)
+        next_state = np.array([next_load, next_capacity, next_cpu_usage, next_memory_usage, next_latency, num_vms])
+        # print(next_state)
     # Check if the episode is done
         done = self.time >= 5000  # or some other condition that defines an end of an episode
 
@@ -101,7 +103,7 @@ class Environment:
         initial_cpu_usage = self.cpu_usage(self.time)
         initial_memory_usage = self.memory_usage(self.time)
         initial_latency = self.latency(self.time)
-        initial_state = np.array([initial_load, initial_capacity, initial_cpu_usage, initial_memory_usage, initial_latency])
+        initial_state = np.array([initial_load, initial_capacity, initial_cpu_usage, initial_memory_usage, initial_latency, self.num_vms])
         return initial_state
 
 

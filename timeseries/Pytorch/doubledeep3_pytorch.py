@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 def train_agent(train_steps, max_episodes_per_step=1000):
     env = Environment()
-    state_size = 5
+    state_size = 6
     action_size = 3
     sequence_length = 10
     batch_size = 16
@@ -27,26 +27,56 @@ def train_agent(train_steps, max_episodes_per_step=1000):
         total_reward = 0
         no_improvement_counter = 0
         best_reward = -np.inf
+
+
+        episode_load = []
+        episode_read_percentage = []
+        episode_mem_usage = []
+        episode_cpu_usage = []
+        episode_num_vm = []
         
         done = False  # Initialize done outside the loop
         step_count = 0  # Initialize step_count
         from tqdm import tqdm
         while not done:
-            for _ in tqdm(range(max_episodes_per_step)):
+            for episode_idx in tqdm(range(max_episodes_per_step)):
                 action = agent.act(state, verbose=0)
 
-                num_vms, next_load, reward = env.step(action)
+                new_state, reward, done = env.step(action)
                 total_reward += reward
+                print("here")
+                print(new_state)
+                print("Shape of next_state:", new_state.shape)
 
                 next_state = np.zeros((sequence_length, state_size))
                 next_state[:-1] = state[1:]
-                next_state[-1][0] = next_load
+                next_state[-1][0] = env.load(env.time + sequence_length)
                 next_state[-1][1] = env.read_percentage(env.time + sequence_length)
                 next_state[-1][2] = env.cpu_usage(env.time + sequence_length)
                 next_state[-1][3] = env.memory_usage(env.time + sequence_length)
                 next_state[-1][4] = env.latency(env.time + sequence_length)
+                
+                print(next_state)
+                
+                
+                # next_state = np.zeros((sequence_length, state_size))
+                # next_state[:-1] = new_state[1:]
+                # next_state[-1][0] = new_state[0]
+                # next_state[-1][1] = new_state[1]
+                # next_state[-1][2] = new_state[2]
+                # next_state[-1][3] = new_state[3]
+                # next_state[-1][4] = new_state[4]
+                # next_state[-1][5] = new_state[5]
+
 
                 agent.remember(state, action, reward, next_state, done)
+
+                episode_load.append(next_state[-1][0])
+                episode_read_percentage.append(next_state[-1][1])
+                episode_mem_usage.append(next_state[-1][2])
+                episode_cpu_usage.append(next_state[-1][3])
+                episode_num_vm.append(next_state[-1][5])
+
                 state = next_state
 
                 if len(agent.memory) > batch_size:
@@ -66,6 +96,12 @@ def train_agent(train_steps, max_episodes_per_step=1000):
                     done = True
                     break  # Exit the loop when termination condition is met
 
+                if episode_idx % 2 == 0:
+                    agent.plot_loss_history()
+
+                if episode_idx % 10 == 0:
+                    evaluate_agent(agent, 100)
+
             rewards.append(total_reward)
             episode_loads.append(episode_load)
             episode_read_percentages.append(episode_read_percentage)
@@ -75,44 +111,56 @@ def train_agent(train_steps, max_episodes_per_step=1000):
             if done:
                 break  # Exit the outer loop when termination condition is met
 
+
     with open(f"rewards_{train_steps}.txt", "w") as f:
         for reward in rewards:
             f.write(str(reward) + "\n")
 
-    agent.online_model.save_weights(f'model_{train_steps}.weights.h5')
-    print(f"Model for {train_steps} training steps saved to 'model_{train_steps}.h5'.")
-    print("Training completed.\n")
+    agent.save_model(f'model_{train_steps}.pth')
+    # print(f"Model for {train_steps} training steps saved to 'model_{train_steps}.h5'.")
+    # print("Training completed.\n")
     return episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_num_vms
 
 
-def evaluate_agent(train_steps):
+def evaluate_agent(agent, eval_steps):
     env = Environment()
     state_size = 5
     action_size = 3
     sequence_length = 10
     batch_size = 16
-    agent = DDQNAgent(state_size, action_size, sequence_length)
+    # agent = DDQNAgent(state_size, action_size, sequence_length)
 
     # Load the trained model weights
-    agent.online_model.load_weights(f'model_{train_steps}.weights.h5')
+    # agent.online_model.load_weights(f'model_{train_steps}.weights.h5')
 
     total_rewards = []
-    episode_load = []
-    episode_read_percentage = []
-    episode_mem_usage = []
-    episode_cpu_usage = []
-    episode_num_vm = []
+    episode_loads = []
+    episode_read_percentages = []
+    episode_mem_usages = []
+    episode_cpu_usages = []
+    episode_num_vms = []
 
-    for _ in range(eval_steps):
+    for _ in range(1):
         state = np.zeros((sequence_length, state_size))
         total_reward = 0
 
+        episode_load = []
+        episode_read_percentage = []
+        episode_mem_usage = []
+        episode_cpu_usage = []
+        episode_num_vm = []
+
+
+
         done = False
+        idx = 0 
         while not done:
-            
+            idx += 1
+            # print('Processing %d' % idx)
             action = agent.act(state, verbose=0)
 
             num_vms, next_load, reward = env.step(action)
+            # print(reward)
             total_reward += reward
 
             next_state = np.zeros((sequence_length, state_size))
@@ -123,11 +171,21 @@ def evaluate_agent(train_steps):
             next_state[-1][3] = env.memory_usage(env.time + sequence_length)
             next_state[-1][4] = env.latency(env.time + sequence_length)
 
+
+            episode_load.append(next_state[-1][0])
+            episode_read_percentage.append(next_state[-1][1])
+            episode_mem_usage.append(next_state[-1][2])
+            episode_cpu_usage.append(next_state[-1][3])
+            episode_num_vm.append(num_vms)
+
             state = next_state
 
-            if total_reward <= -200:  # Terminate if total reward is less than or equal to -200
-                done = True
+            if idx > eval_steps:
+                break
 
+            # if total_reward <= -200:  # Terminate if total reward is less than or equal to -200
+                # done = True
+        # print(total_reward)
         total_rewards.append(total_reward)
         episode_loads.append(episode_load)
         episode_read_percentages.append(episode_read_percentage)

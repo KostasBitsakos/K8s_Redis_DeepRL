@@ -4,6 +4,7 @@ import pandas as pd
 from environment import Environment
 from ddqn import DDQNAgent
 import matplotlib.pyplot as plt
+import torch
 
 
 
@@ -205,58 +206,90 @@ def evaluate_agent(agent, eval_steps):
     return episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms
 
 
-def plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms):
+import matplotlib.pyplot as plt
+
+
+def plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms, output_filename_prefix):
     # Plotting metrics
     plt.figure(figsize=(12, 10))
 
+    # Plot Load Over Time
     plt.subplot(3, 2, 1)
     for episode_load in episode_loads:
         plt.plot(range(len(episode_load)), episode_load, alpha=0.5)
     plt.xlabel('Time')
     plt.ylabel('Load')
     plt.title('Load Over Time')
+    plot_dots(plt, episode_num_vms, 'Load')
 
+    # Plot Read Percentage Over Time
     plt.subplot(3, 2, 2)
     for episode_read_percentage in episode_read_percentages:
         plt.plot(range(len(episode_read_percentage)), episode_read_percentage, alpha=0.5)
     plt.xlabel('Time')
     plt.ylabel('Read Percentage')
     plt.title('Read Percentage Over Time')
+    plot_dots(plt, episode_num_vms, 'Read Percentage')
 
+    # Plot Memory Usage Over Time
     plt.subplot(3, 2, 3)
     for episode_mem_usage in episode_mem_usages:
         plt.plot(range(len(episode_mem_usage)), episode_mem_usage, alpha=0.5)
     plt.xlabel('Time')
     plt.ylabel('Memory Usage')
     plt.title('Memory Usage Over Time')
+    plot_dots(plt, episode_num_vms, 'Memory Usage')
 
+    # Plot CPU Usage Over Time
     plt.subplot(3, 2, 4)
     for episode_cpu_usage in episode_cpu_usages:
         plt.plot(range(len(episode_cpu_usage)), episode_cpu_usage, alpha=0.5)
     plt.xlabel('Time')
     plt.ylabel('CPU Usage')
     plt.title('CPU Usage Over Time')
+    plot_dots(plt, episode_num_vms, 'CPU Usage')
 
+    # Plot Latency Over Time
     plt.subplot(3, 2, 5)
     for episode_latency in episode_latencies:
         plt.plot(range(len(episode_latency)), episode_latency, alpha=0.5)
     plt.xlabel('Time')
     plt.ylabel('Latency')
     plt.title('Latency Over Time')
+    plot_dots(plt, episode_num_vms, 'Latency')
 
+    # Plot Number of VMs Over Time
     plt.subplot(3, 2, 6)
     for episode_num_vm in episode_num_vms:
         plt.plot(range(len(episode_num_vm)), episode_num_vm, alpha=0.5)
     plt.xlabel('Time')
     plt.ylabel('Number of VMs')
     plt.title('Number of VMs Over Time')
+    plot_dots(plt, episode_num_vms, 'Number of VMs')
 
     plt.tight_layout()
+    plt.savefig(f'{output_filename_prefix}_metrics.jpg')
     plt.show()
+
+def plot_dots(plt, episode_num_vms, label):
+    for episode_num_vm in episode_num_vms:
+        plt.scatter(range(len(episode_num_vm)), episode_num_vm, color='red', marker='o', label='Num VMs')
+
+# Example usage:
+# Assuming episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms are defined.
+# output_prefix = 'evaluation_plots_model_10'
+# plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms, output_prefix)
+
+
+    # Optional: Uncomment to display the plots inline
+    # plt.tight_layout()
+    # plt.show()
+
+
 
 
 if __name__ == '__main__':
-    train_steps_list = [2000, 5000]
+    train_steps_list = [2, 5]
     eval_steps = 2000
     max_episodes_per_step = 1000
 
@@ -265,13 +298,23 @@ if __name__ == '__main__':
         episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms = train_agent(train_steps, max_episodes_per_step)
         print("Training completed.\n")
 
-    print("Training completed for all steps.\n")
-
     for train_steps in train_steps_list:
         print(f"Evaluating using model trained with {train_steps} steps...")
-        episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms = evaluate_agent(agent, eval_steps)
-        plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms)
+        
+        # Initialize DDQNAgent
+        agent = DDQNAgent(state_size=6, action_size=3, sequence_length=10)
+        
+        # Load corresponding model weights
+        model_filename = f'model_{train_steps}.pth'
+        agent.online_model.load_state_dict(torch.load(model_filename))
 
+        # Evaluate using evaluate_agent function
+        episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms = evaluate_agent(agent, eval_steps)
+        
+        # Plot metrics for evaluation
+        output_prefix = f'evaluation_plots_model_{train_steps}'
+        plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms, output_filename_prefix=output_prefix)
+        
         print(f"Evaluation completed for model trained with {train_steps} steps.\n")
 
     print("All evaluations completed.")

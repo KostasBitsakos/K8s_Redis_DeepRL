@@ -101,6 +101,7 @@ class DDQNAgent:
 
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
+       # print(f"Epsilon is {self.epsilon}")
 
         self.update_target_model()
         self.loss_history.append(np.mean(batch_losses))

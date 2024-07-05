@@ -86,11 +86,11 @@ def train_agent(train_steps, max_episodes_per_step=1000):
 
                 if len(agent.memory) > batch_size:
                     agent.replay(batch_size)
-                if total_reward > best_reward:
-                    best_reward = total_reward
-                    no_improvement_counter = 0
-                else:
-                    no_improvement_counter += 1
+                # if total_reward > best_reward:
+                #     best_reward = total_reward
+                #     no_improvement_counter = 0
+                # else:
+                #     no_improvement_counter += 1
 
                 if no_improvement_counter > 100:  # Terminate if no improvement in 100 consecutive episodes
                     done = True
@@ -202,6 +202,8 @@ def evaluate_agent(agent, eval_steps):
 
     avg_reward = np.mean(total_rewards)
     print(f"Avg. reward for model trained with {train_steps} steps: {avg_reward}")
+    print(f"Epsilon is {agent.epsilon}")
+
     
     return episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms
 
@@ -209,63 +211,84 @@ def evaluate_agent(agent, eval_steps):
 import matplotlib.pyplot as plt
 
 
+import matplotlib.pyplot as plt
+
 def plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms, output_filename_prefix):
     # Plotting metrics
     plt.figure(figsize=(12, 10))
 
     # Plot Load Over Time
-    plt.subplot(3, 2, 1)
+    ax1 = plt.subplot(3, 2, 1)
     for episode_load in episode_loads:
-        plt.plot(range(len(episode_load)), episode_load, alpha=0.5)
-    plt.xlabel('Time')
-    plt.ylabel('Load')
-    plt.title('Load Over Time')
-    plot_dots(plt, episode_num_vms, 'Load')
+        ax1.plot(range(len(episode_load)), episode_load, alpha=0.5, label='Load')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Load')
+    ax1.set_title('Load Over Time')
+
+    ax2 = ax1.twinx()
+    for episode_num_vm in episode_num_vms:
+        ax2.scatter(range(len(episode_num_vm)), episode_num_vm, color='red', marker='o', label='Num VMs')
+    ax2.set_ylabel('Number of VMs')
 
     # Plot Read Percentage Over Time
-    plt.subplot(3, 2, 2)
+    ax3 = plt.subplot(3, 2, 2)
     for episode_read_percentage in episode_read_percentages:
-        plt.plot(range(len(episode_read_percentage)), episode_read_percentage, alpha=0.5)
-    plt.xlabel('Time')
-    plt.ylabel('Read Percentage')
-    plt.title('Read Percentage Over Time')
-    plot_dots(plt, episode_num_vms, 'Read Percentage')
+        ax3.plot(range(len(episode_read_percentage)), episode_read_percentage, alpha=0.5, label='Read Percentage')
+    ax3.set_xlabel('Time')
+    ax3.set_ylabel('Read Percentage')
+    ax3.set_title('Read Percentage Over Time')
+
+    ax4 = ax3.twinx()
+    for episode_num_vm in episode_num_vms:
+        ax4.scatter(range(len(episode_num_vm)), episode_num_vm, color='red', marker='o', label='Num VMs')
+    ax4.set_ylabel('Number of VMs')
 
     # Plot Memory Usage Over Time
-    plt.subplot(3, 2, 3)
+    ax5 = plt.subplot(3, 2, 3)
     for episode_mem_usage in episode_mem_usages:
-        plt.plot(range(len(episode_mem_usage)), episode_mem_usage, alpha=0.5)
-    plt.xlabel('Time')
-    plt.ylabel('Memory Usage')
-    plt.title('Memory Usage Over Time')
-    plot_dots(plt, episode_num_vms, 'Memory Usage')
+        ax5.plot(range(len(episode_mem_usage)), episode_mem_usage, alpha=0.5, label='Memory Usage')
+    ax5.set_xlabel('Time')
+    ax5.set_ylabel('Memory Usage')
+    ax5.set_title('Memory Usage Over Time')
+
+    ax6 = ax5.twinx()
+    for episode_num_vm in episode_num_vms:
+        ax6.scatter(range(len(episode_num_vm)), episode_num_vm, color='red', marker='o', label='Num VMs')
+    ax6.set_ylabel('Number of VMs')
 
     # Plot CPU Usage Over Time
-    plt.subplot(3, 2, 4)
+    ax7 = plt.subplot(3, 2, 4)
     for episode_cpu_usage in episode_cpu_usages:
-        plt.plot(range(len(episode_cpu_usage)), episode_cpu_usage, alpha=0.5)
-    plt.xlabel('Time')
-    plt.ylabel('CPU Usage')
-    plt.title('CPU Usage Over Time')
-    plot_dots(plt, episode_num_vms, 'CPU Usage')
+        ax7.plot(range(len(episode_cpu_usage)), episode_cpu_usage, alpha=0.5, label='CPU Usage')
+    ax7.set_xlabel('Time')
+    ax7.set_ylabel('CPU Usage')
+    ax7.set_title('CPU Usage Over Time')
+
+    ax8 = ax7.twinx()
+    for episode_num_vm in episode_num_vms:
+        ax8.scatter(range(len(episode_num_vm)), episode_num_vm, color='red', marker='o', label='Num VMs')
+    ax8.set_ylabel('Number of VMs')
 
     # Plot Latency Over Time
-    plt.subplot(3, 2, 5)
+    ax9 = plt.subplot(3, 2, 5)
     for episode_latency in episode_latencies:
-        plt.plot(range(len(episode_latency)), episode_latency, alpha=0.5)
-    plt.xlabel('Time')
-    plt.ylabel('Latency')
-    plt.title('Latency Over Time')
-    plot_dots(plt, episode_num_vms, 'Latency')
+        ax9.plot(range(len(episode_latency)), episode_latency, alpha=0.5, label='Latency')
+    ax9.set_xlabel('Time')
+    ax9.set_ylabel('Latency')
+    ax9.set_title('Latency Over Time')
+
+    ax10 = ax9.twinx()
+    for episode_num_vm in episode_num_vms:
+        ax10.scatter(range(len(episode_num_vm)), episode_num_vm, color='red', marker='o', label='Num VMs')
+    ax10.set_ylabel('Number of VMs')
 
     # Plot Number of VMs Over Time
-    plt.subplot(3, 2, 6)
+    ax11 = plt.subplot(3, 2, 6)
     for episode_num_vm in episode_num_vms:
-        plt.plot(range(len(episode_num_vm)), episode_num_vm, alpha=0.5)
-    plt.xlabel('Time')
-    plt.ylabel('Number of VMs')
-    plt.title('Number of VMs Over Time')
-    plot_dots(plt, episode_num_vms, 'Number of VMs')
+        ax11.plot(range(len(episode_num_vm)), episode_num_vm, alpha=0.5, label='Number of VMs')
+    ax11.set_xlabel('Time')
+    ax11.set_ylabel('Number of VMs')
+    ax11.set_title('Number of VMs Over Time')
 
     plt.tight_layout()
     plt.savefig(f'{output_filename_prefix}_metrics.jpg')
@@ -273,7 +296,9 @@ def plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, ep
 
 def plot_dots(plt, episode_num_vms, label):
     for episode_num_vm in episode_num_vms:
-        plt.scatter(range(len(episode_num_vm)), episode_num_vm, color='red', marker='o', label='Num VMs')
+        plt.scatter(range(len(episode_num_vm)), episode_num_vm, color='red', marker='o', label=label)
+
+
 
 # Example usage:
 # Assuming episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms are defined.
@@ -289,14 +314,14 @@ def plot_dots(plt, episode_num_vms, label):
 
 
 if __name__ == '__main__':
-    train_steps_list = [2, 5]
-    eval_steps = 2000
+    train_steps_list = [2, 5, 10, 50]
+    eval_steps = 4000
     max_episodes_per_step = 1000
 
-    for train_steps in train_steps_list:
-        print(f"Training for {train_steps} steps...")
-        episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms = train_agent(train_steps, max_episodes_per_step)
-        print("Training completed.\n")
+    # for train_steps in train_steps_list:
+    #     print(f"Training for {train_steps} steps...")
+    #     episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms = train_agent(train_steps, max_episodes_per_step)
+    #     print("Training completed.\n")
 
     for train_steps in train_steps_list:
         print(f"Evaluating using model trained with {train_steps} steps...")
@@ -313,8 +338,9 @@ if __name__ == '__main__':
         
         # Plot metrics for evaluation
         output_prefix = f'evaluation_plots_model_{train_steps}'
-        plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms, output_filename_prefix=output_prefix)
-        
+        #plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms, output_filename_prefix="plots_double_y")
+        plot_metrics(episode_loads, episode_read_percentages, episode_mem_usages, episode_cpu_usages, episode_latencies, episode_num_vms, output_filename_prefix=f"plots_double_y_{train_steps}")
+
         print(f"Evaluation completed for model trained with {train_steps} steps.\n")
 
     print("All evaluations completed.")

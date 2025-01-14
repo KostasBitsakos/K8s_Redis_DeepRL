@@ -15,7 +15,7 @@ class Environment:
         self.spike_position = 1500  # Moved spike occurrence later
         self.spike_length = 100  # Spike duration
         self.spike_amplitude = 3  # Spike amplitude for other metrics
-        self.load_spike_amplitude = 80  # Further increased spike amplitude for load
+        self.load_spike_amplitude = 150  # Further increased spike amplitude for load
 
     def load(self, t):
         # Generate sinusoidal load with noise
@@ -162,8 +162,8 @@ if __name__ == "__main__":
     plt.savefig('metrics.png')
     plt.show()
 
-
-   #env = Environment()
+    # Instead of showing the plot, save it to a file
+    # env = Environment()
     env.time = 0
     actions = [0, 1, 2]  # Possible actions
 

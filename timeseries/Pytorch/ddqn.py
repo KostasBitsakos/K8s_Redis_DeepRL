@@ -40,10 +40,7 @@ class DDQNAgent:
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
         state = np.array(state)
-        # print(state)
-        # print("here")
         state = np.reshape(state, (1, self.sequence_length, self.state_size))
-        # print(state)
         state = torch.tensor(state, dtype=torch.float32)
 
         self.online_model.eval()
@@ -58,56 +55,42 @@ class DDQNAgent:
         plt.savefig('losses.jpg')
         plt.close('all')
 
-
     def replay(self, batch_size):
         minibatch = random.sample(self.memory, batch_size)
-        import time
-
         batch_losses = []
+
         for state, action, reward, next_state, done in minibatch:
-            # print(state.shape, np.array(action).shape, np.array(reward).shape, next_state.shape)
             target = reward
             if not done:
                 next_state = np.array([next_state])
                 next_state = np.reshape(next_state, (1, self.sequence_length, self.state_size))
                 next_state = torch.tensor(next_state, dtype=torch.float32)
-                # prediction of next state
-                target = (reward + self.gamma * torch.max(self.target_model.forward(next_state)))
+                target = (reward + self.gamma * torch.max(self.target_model.forward(next_state)).item())
 
             state = np.array([state])
             state = np.reshape(state, (1, self.sequence_length, self.state_size))
             state = torch.tensor(state, dtype=torch.float32)
-            start = time.time()
-
-            # print(target, 'target')
 
             self.online_model.eval()
             with torch.no_grad():
-                target_f = self.online_model.forward(state)
+                target_f = self.online_model.forward(state).detach().clone()
+            target_f[0][action] = target
 
-                target_f[0][action] = target
-            
             self.online_model.train()
-            self.online_model.zero_grad()
-            target = self.online_model.forward(state)
-            # print(target, target_f)
-            loss = self.criterion(target_f.detach(), target)
+            self.optimizer.zero_grad()
+            predictions = self.online_model.forward(state)
+            loss = self.criterion(predictions, target_f)
             loss.backward()
-            # print(loss)
             self.optimizer.step()
-            # print("Time taken for one replay step: ", time.time() - start)
-
             batch_losses.append(loss.item())
 
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
-       # print(f"Epsilon is {self.epsilon}")
 
         self.update_target_model()
         self.loss_history.append(np.mean(batch_losses))
 
 if __name__ == "__main__":
-    agent=DDQNAgent(6,3,10)
+    agent = DDQNAgent(6, 3, 10)
     arr = np.arange(60)
-
     agent.act(arr)
